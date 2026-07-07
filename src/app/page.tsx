@@ -57,7 +57,7 @@ export default function HomePage() {
         <div className="text-xs font-bold text-slate-400 pt-4 border-t border-slate-100 relative z-10 space-y-1">
           <div>جميع الحقوق محفوظة © {new Date().getFullYear()} SweetHub</div>
           <div className="text-slate-400 font-medium">
-            تم التطوير بكل ❤️ بواسطة <span className="text-amber-600 font-black">محمد عبدالباقي</span>
+            تم التطوير  بواسطة <span className="text-amber-600 font-black">Mohamed Abdelbaqy Ahmed </span>
           </div>
         </div>
 

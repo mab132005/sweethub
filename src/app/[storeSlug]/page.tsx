@@ -348,7 +348,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
               {/* 🏆 بصمة المطور المحترف في قاع السلة والصفحة */}
               <div className="text-center pt-2 text-[10px] font-bold text-slate-400 space-y-0.5">
                 <div>جميع الحقوق محفوظة © {new Date().getFullYear()} SweetHub</div>
-                <div>تم التطوير بكل ❤️ بواسطة <span className="text-amber-600 font-black">محمد عبدالباقي</span></div>
+                <div>تم التطوير  بواسطة <span className="text-amber-600 font-black">Mohamed Abdelbaqy Ahmed </span></div>
               </div>
 
             </div>
