@@ -5,7 +5,8 @@ import { db } from "@/firebase/config";
 import { collection, query, where, getDocs, doc, updateDoc, increment } from "firebase/firestore";
 import { Store } from "@/types";
 import { useCart } from "@/context/CartContext";
-import { ShoppingCart, Plus, Minus, Trash2, Phone, MapPin, MessageSquare, Loader2, Search, X, Check } from "lucide-react";
+import NextImage from "next/image";
+import { ShoppingCart, Plus, Minus, Trash2, Loader2, Search, MessageSquare, User, Phone, AlertCircle } from "lucide-react";
 
 interface StorefrontProps {
   params: Promise<{ storeSlug: string }>;
@@ -44,6 +45,10 @@ export default function StorefrontPage({ params }: StorefrontProps) {
   const [modalSizeSelection, setModalSizeSelection] = useState<"small" | "large">("small");
 
   const [gridSizeSelections, setGridSizeSelections] = useState<Record<string, "small" | "large">>({});
+
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
 
   useEffect(() => {
     const fetchStoreData = async () => {
@@ -88,7 +93,10 @@ export default function StorefrontPage({ params }: StorefrontProps) {
         console.error(error);
         setNotFound(true);
       } finally {
-        setLoading(false);
+        setLoading((prev) => {
+          if (prev) return false;
+          return prev;
+        });
       }
     };
     fetchStoreData();
@@ -132,16 +140,17 @@ export default function StorefrontPage({ params }: StorefrontProps) {
             const currentSize = gridSizeSelections[prod.id] || "small";
             const currentPrice = currentSize === "small" ? prod.smallUnitPrice : prod.largeUnitPrice;
 
-            // حساب سعر الحبة/الكيلو الفردي داخل الكرتونة تلقائياً للعرض والتوضيح
-            const calculatedSinglePrice = currentSize === "large" && prod.conversionFactor > 0 
-              ? (prod.largeUnitPrice / prod.conversionFactor).toFixed(1) 
-              : null;
-
             return (
               <div key={prod.id} className="bg-white rounded-3xl shadow-sm hover:shadow-xl transition flex flex-col overflow-hidden border border-slate-200">
                 <div onClick={() => { setSelectedProduct(prod); setModalSizeSelection(currentSize); }} className="cursor-pointer">
                   <div className="relative aspect-[4/3] w-full bg-slate-100">
-                    <img src={prod.imageUrl || "https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=600&q=80"} alt={prod.nameAr} className="w-full h-full object-cover" />
+                    <NextImage 
+                      src={prod.imageUrl || "https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=600&q=80"} 
+                      alt={prod.nameAr} 
+                      fill 
+                      unoptimized
+                      className="object-cover"
+                    />
                   </div>
                   <div className="p-5">
                     <h3 className="text-xl font-black text-slate-900 line-clamp-1">{prod.nameAr}</h3>
@@ -160,19 +169,15 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                 <div className="p-5 pt-2 mt-auto border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <div className="flex flex-col">
                     <span className="text-2xl font-black text-slate-950">{currentPrice} ج.م</span>
-                    {/* حساب تلقائي وعرض ذكي لتقسيم وحساب الكمية الصغيره */}
                     <span className="text-xs text-slate-600 font-bold mt-1">
-                      {currentSize === "small" 
-                        ? `لـ ${prod.smallUnitName}` 
-                        : `العِدْل: ${prod.conversionFactor} ${prod.smallUnitName} (واقف بـ ${calculatedSinglePrice} ج.م لـ ${prod.smallUnitName})`
-                      }
+                      {currentSize === "small" ? `لـ ${prod.smallUnitName}` : `لـ ${prod.largeUnitName}`}
                     </span>
                   </div>
 
                   <button
                     onClick={() => addToCart({ 
                       id: `${prod.id}-${currentSize}`, 
-                      nameAr: `${prod.nameAr} (${currentSize === "small" ? prod.smallUnitName : `${prod.largeUnitName} [سعة ${prod.conversionFactor} ${prod.smallUnitName}]`})`, 
+                      nameAr: prod.nameAr, 
                       pricePerKG: currentPrice, 
                       category: "حلويات" 
                     })}
@@ -188,14 +193,20 @@ export default function StorefrontPage({ params }: StorefrontProps) {
         </div>
       </main>
 
-      {/* الـ Modal المحدث بالتفاصيل الحسابية التلقائية */}
+      {/* الـ Modal للتفاصيل */}
       {selectedProduct && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl relative flex flex-col md:flex-row">
             <button onClick={() => setSelectedProduct(null)} className="absolute top-4 left-4 z-20 bg-slate-900/60 text-white p-2 rounded-full">✕</button>
             
-            <div className="w-full md:w-1/2 bg-slate-950">
-              <img src={selectedProduct.imageUrl || "https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=600&q=80"} alt="" className="w-full h-full object-cover" />
+            <div className="w-full md:w-1/2 bg-slate-950 relative aspect-[4/3] md:aspect-auto">
+              <NextImage 
+                src={selectedProduct.imageUrl || "https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=600&q=80"} 
+                alt="" 
+                fill 
+                unoptimized
+                className="object-cover"
+              />
             </div>
 
             <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col bg-white">
@@ -211,9 +222,6 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                   <button onClick={() => setModalSizeSelection("large")} className={`p-4 rounded-2xl border-2 text-center ${modalSizeSelection === "large" ? "border-amber-500 bg-amber-50/40" : "border-slate-200"}`}>
                     <span className="font-black text-lg block">{selectedProduct.largeUnitName}</span>
                     <span className="text-sm font-bold text-slate-900">{selectedProduct.largeUnitPrice} ج.م</span>
-                    <span className="text-[11px] text-amber-800 font-black block mt-1">
-                      (تساوي {selectedProduct.conversionFactor} {selectedProduct.smallUnitName} - الـ {selectedProduct.smallUnitName} بـ {(selectedProduct.largeUnitPrice / selectedProduct.conversionFactor).toFixed(1)} ج.م)
-                    </span>
                   </button>
                 </div>
               </div>
@@ -223,8 +231,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                 <button
                   onClick={() => {
                     const pPrice = modalSizeSelection === "small" ? selectedProduct.smallUnitPrice : selectedProduct.largeUnitPrice;
-                    const pUnit = modalSizeSelection === "small" ? selectedProduct.smallUnitName : `${selectedProduct.largeUnitName} [${selectedProduct.conversionFactor} ${selectedProduct.smallUnitName}]`;
-                    addToCart({ id: `${selectedProduct.id}-${modalSizeSelection}`, nameAr: `${selectedProduct.nameAr} (${pUnit})`, pricePerKG: pPrice, category: "حلويات" });
+                    addToCart({ id: `${selectedProduct.id}-${modalSizeSelection}`, nameAr: selectedProduct.nameAr, pricePerKG: pPrice, category: "حلويات" });
                     setSelectedProduct(null);
                   }}
                   className="py-4 px-8 text-white font-black rounded-2xl text-base" style={{ backgroundColor: accentColor }}
@@ -237,7 +244,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
         </div>
       )}
 
-      {/* سلة المشتريات المحدثة لحساب ضرب كمية العبوات التلقائي */}
+      {/* سلة المشتريات الجانبية المحدثة */}
       {isCartOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-end">
           <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between rounded-l-3xl overflow-hidden">
@@ -252,45 +259,98 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                   <span className="text-6xl">🛒</span><p>السلة فارغة الحين!</p>
                 </div>
               ) : (
-                cartItems.map((item) => {
-                  // استخراج معامل التحويل التلقائي من النص إذا كان الحجم كبيراً لحساب الصافي
-                  const isLarge = item.id.endsWith("-large");
-                  const match = item.nameAr.match(/سعة (\d+)/) || item.nameAr.match(/\[(\d+)/);
-                  const factor = match ? parseInt(match[1]) : 1;
-                  const totalSmallUnits = isLarge ? factor * item.quantity : null;
-
-                  return (
-                    <div key={item.id} className="bg-white p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm border border-slate-200">
-                      <div className="space-y-1">
-                        <h4 className="font-black text-slate-950 text-sm leading-tight">{item.nameAr}</h4>
-                        <p className="text-sm font-black text-amber-600">{item.pricePerKG * item.quantity} ج.م</p>
-                        {/* عرض حساب الكمية الصغيره التلقائي الإجمالي في السلة */}
-                        {totalSmallUnits && (
-                          <div className="text-[11px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded shadow-sm inline-block">
-                            إجمالي الكمية الصافية: {totalSmallUnits} وحدة صغيرة
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 bg-slate-100 border-2 border-slate-300 rounded-xl p-1 shrink-0">
-                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 text-slate-900 bg-white rounded-lg shadow-sm font-bold"><Minus className="w-4 h-4" /></button>
-                        <span className="text-sm font-black text-slate-950 px-1">{item.quantity}</span>
-                        <button onClick={() => addToCart(item)} className="p-1 text-slate-900 bg-white rounded-lg shadow-sm font-bold"><Plus className="w-4 h-4" /></button>
-                      </div>
-                      <button onClick={() => removeFromCart(item.id)} className="text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                cartItems.map((item) => (
+                  <div key={item.id} className="bg-white p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm border border-slate-200">
+                    <div className="space-y-1">
+                      <h4 className="font-black text-slate-950 text-sm leading-tight">{item.nameAr}</h4>
+                      <p className="text-sm font-black text-amber-600">{item.pricePerKG * item.quantity} ج.م</p>
                     </div>
-                  );
-                })
+                    <div className="flex items-center gap-3 bg-slate-100 border-2 border-slate-300 rounded-xl p-1 shrink-0">
+                      <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 text-slate-900 bg-white rounded-lg shadow-sm font-bold"><Minus className="w-4 h-4" /></button>
+                      <span className="text-sm font-black text-slate-950 px-1">{item.quantity}</span>
+                      <button onClick={() => addToCart(item)} className="p-1 text-slate-900 bg-white rounded-lg shadow-sm font-bold"><Plus className="w-4 h-4" /></button>
+                    </div>
+                    <button onClick={() => removeFromCart(item.id)} className="text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                ))
               )}
             </div>
 
+            {/* فوتر السلة المحدث وحفظ بصمة المطور الفنية */}
             <div className="p-6 border-t border-slate-200 bg-white space-y-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+              
+              {cartItems.length > 0 && (
+                <div className="space-y-3 bg-slate-50 border border-slate-200 p-4 rounded-2xl">
+                  <h4 className="text-xs font-black text-slate-700 border-b border-slate-200 pb-1.5">بيانات العميل المستلم:</h4>
+                  
+                  <div className="relative">
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                      <User className="w-4 h-4" />
+                    </span>
+                    <input 
+                      type="text" 
+                      placeholder="اسمك بالكامل *" 
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full pl-3 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:border-amber-500 focus:outline-none transition"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                      <Phone className="w-4 h-4" />
+                    </span>
+                    <input 
+                      type="tel" 
+                      placeholder="رقم الموبيل الفعلي *" 
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full pl-3 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 text-right focus:border-amber-500 focus:outline-none transition"
+                      style={{ direction: "ltr" }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {checkoutError && (
+                <div className="flex items-center gap-1.5 p-2.5 bg-red-50 text-red-700 rounded-xl text-[11px] font-bold border border-red-200 animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{checkoutError}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between font-black text-slate-950 text-lg">
                 <span>الإجمالي النهائي:</span>
                 <span className="text-2xl" style={{ color: accentColor }}>{getCartSubtotal()} ج.م</span>
               </div>
-              <button onClick={() => sendOrderWhatsApp(store.whatsapp, store.storeName)} disabled={cartItems.length === 0 || !store.whatsapp} className="w-full flex items-center justify-center gap-2 py-4 px-4 text-white font-black rounded-2xl text-lg shadow-md" style={{ backgroundColor: store.whatsapp ? "#25D366" : undefined }}>
-                <MessageSquare className="w-6 h-6 stroke-[2.5]" /><span>إتمام الطلب عبر واتساب</span>
+
+              <button 
+                onClick={() => {
+                  if (!customerName.trim()) {
+                    setCheckoutError("من فضلك اكتب اسمك لتأكيد استلام الطلب!");
+                    return;
+                  }
+                  if (!customerPhone.trim() || customerPhone.trim().length < 11) {
+                    setCheckoutError("يرجى إدخال رقم موبايل صحيح مكون من 11 رقم!");
+                    return;
+                  }
+                  setCheckoutError("");
+                  sendOrderWhatsApp(store?.whatsapp || "", store?.storeName || "", customerName, customerPhone);
+                }} 
+                disabled={cartItems.length === 0 || !store?.whatsapp} 
+                className="w-full flex items-center justify-center gap-2 py-4 px-4 text-white font-black rounded-2xl text-lg shadow-md" 
+                style={{ backgroundColor: store?.whatsapp ? "#25D366" : undefined }}
+              >
+                <MessageSquare className="w-6 h-6 stroke-[2.5]" />
+                <span>إتمام الطلب عبر واتساب</span>
               </button>
+
+              {/* 🏆 بصمة المطور المحترف في قاع السلة والصفحة */}
+              <div className="text-center pt-2 text-[10px] font-bold text-slate-400 space-y-0.5">
+                <div>جميع الحقوق محفوظة © {new Date().getFullYear()} SweetHub</div>
+                <div>تم التطوير بكل ❤️ بواسطة <span className="text-amber-600 font-black">محمد عبدالباقي</span></div>
+              </div>
+
             </div>
           </div>
         </div>

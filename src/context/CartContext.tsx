@@ -17,7 +17,7 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   getCartSubtotal: () => number;
-  sendOrderWhatsApp: (whatsappNumber: string, storeName: string) => void;
+  sendOrderWhatsApp: (whatsappNumber: string, storeName: string, customerName: string, customerPhone: string) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -40,7 +40,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return [];
   });
 
-  // حفظ السلة تلقائياً كل ما تتغير
   useEffect(() => {
     localStorage.setItem("sweethub_cart", JSON.stringify(cartItems));
   }, [cartItems]);
@@ -76,16 +75,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return cartItems.reduce((total, item) => total + item.pricePerKG * item.quantity, 0);
   };
 
-  // الدالة النظيفة بعد إزالة إجمالي الوزن الصافي والوحدات الفرعية
-  const sendOrderWhatsApp = (whatsappNumber: string, storeName: string) => {
+  const sendOrderWhatsApp = (whatsappNumber: string, storeName: string, customerName: string, customerPhone: string) => {
     if (cartItems.length === 0) return;
 
-    // 1. هيدر الرسالة
     let message = `*طلب جديد من متجر: ${storeName}*\n`;
+    message += `--------------------------------\n`;
+    message += `👤 *بيانات الزبون:*\n`;
+    message += `   • الاسم: ${customerName}\n`;
+    message += `   • الهاتف: ${customerPhone}\n`;
     message += `--------------------------------\n\n`;
     message += `أهلاً بك، أود طلب الأصناف التالية:\n\n`;
 
-    // 2. سرد الأصناف بالكمية والسعر والإجمالي فقط
     cartItems.forEach((item, index) => {
       message += `*${index + 1}. ${item.nameAr}*\n`;
       message += `   • الكمية: ${item.quantity}\n`;
@@ -94,14 +94,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       message += `\n`;
     });
 
-    // 3. فوتر الرسالة المالي
     const subtotal = getCartSubtotal();
     message += `--------------------------------\n`;
     message += `*الإجمالي النهائي للطلب: ${subtotal}.00 ج.م*\n`;
     message += `--------------------------------\n\n`;
     message += `يرجى تأكيد الطلب وتجهيزه وتوضيح وقت الاستلام المتاح. شكراً لكم!`;
 
-    // 4. التشفير والفتح المباشر في الواتساب
     const encodedMessage = encodeURIComponent(message);
     const cleanPhone = whatsappNumber.replace(/[+\s-]/g, "");
     const whatsappURL = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
