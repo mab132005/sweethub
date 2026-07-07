@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // دالة مساعدة للتحقق من تسجيل الدخول
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // دالة مساعدة للتحقق من ملكية الحساب أو المتجر
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // قواعد مجموعة المستخدمين
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // قواعد مجموعة المتاجر
+    match /stores/{storeId} {
+      allow read: if true; // متاح للعامة (الزبائن) لقراءة بيانات المتجر
+      allow write: if isOwner(storeId); // صاحب المتجر فقط من يكتب ويعدل
+    }
+
+    // قواعد مجموعة المنتجات
+    match /products/{productId} {
+      allow read: if true; // متاح للزبائن التصفح
+      allow write: if isSignedIn() && request.auth.uid == resource.data.storeId;
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.storeId;
+    }
+
+    // قواعد الأقسام والدرجات
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == request.resource.data.storeId;
+    }
+    
+    match /grades/{gradeId} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == request.resource.data.storeId;
+    }
+  }
+}
