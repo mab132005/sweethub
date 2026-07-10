@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, doc, updateDoc, increment } from "fi
 import { Store } from "@/types";
 import { useCart } from "@/context/CartContext";
 import NextImage from "next/image";
-import { ShoppingCart, Plus, Minus, Trash2, Loader2, Search, MessageSquare, User, Phone, AlertCircle } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Loader2, Search, MessageSquare, User, Phone, AlertCircle, MapPin } from "lucide-react";
 
 interface StorefrontProps {
   params: Promise<{ storeSlug: string }>;
@@ -46,8 +46,10 @@ export default function StorefrontPage({ params }: StorefrontProps) {
 
   const [gridSizeSelections, setGridSizeSelections] = useState<Record<string, "small" | "large">>({});
 
+  // مدخلات العميل بداخل السلة
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState(""); // ✨ إضافة حقل العنوان
   const [checkoutError, setCheckoutError] = useState("");
 
   useEffect(() => {
@@ -135,56 +137,75 @@ export default function StorefrontPage({ params }: StorefrontProps) {
           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="ابحث عن حلوياتك المفضلة هنا..." className="w-full pr-12 pl-4 py-3.5 bg-slate-50 rounded-xl font-bold" />
         </div>
 
+        {/* 📦 شبكة المنتجات بتصميم الكروت المحسن والفاخر */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredProducts.map((prod) => {
             const currentSize = gridSizeSelections[prod.id] || "small";
             const currentPrice = currentSize === "small" ? prod.smallUnitPrice : prod.largeUnitPrice;
 
             return (
-              <div key={prod.id} className="bg-white rounded-3xl shadow-sm hover:shadow-xl transition flex flex-col overflow-hidden border border-slate-200">
-                <div onClick={() => { setSelectedProduct(prod); setModalSizeSelection(currentSize); }} className="cursor-pointer">
-                  <div className="relative aspect-[4/3] w-full bg-slate-100">
+              <div key={prod.id} className="bg-white rounded-3xl shadow-sm hover:shadow-xl transition flex flex-col overflow-hidden border border-slate-200/80 group">
+                <div onClick={() => { setSelectedProduct(prod); setModalSizeSelection(currentSize); }} className="cursor-pointer relative">
+                  <div className="relative aspect-[4/3] w-full bg-slate-100 overflow-hidden">
                     <NextImage 
                       src={prod.imageUrl || "https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=600&q=80"} 
                       alt={prod.nameAr} 
                       fill 
                       unoptimized
-                      className="object-cover"
+                      className="object-cover group-hover:scale-105 transition duration-300"
                     />
                   </div>
-                  <div className="p-5">
-                    <h3 className="text-xl font-black text-slate-900 line-clamp-1">{prod.nameAr}</h3>
+                  <div className="p-4 pb-2">
+                    <h3 className="text-lg font-black text-slate-900 line-clamp-1 group-hover:text-amber-600 transition">{prod.nameAr}</h3>
                   </div>
                 </div>
 
-                <div className="px-5 pb-3 grid grid-cols-2 gap-2.5">
-                  <button onClick={() => setGridSizeSelections(p => ({...p, [prod.id]: "small"}))} className={`py-2.5 text-sm font-black rounded-xl border ${currentSize === "small" ? "bg-slate-900 text-white" : "bg-white text-slate-700"}`}>
+                {/* أزرار اختيار الأحجام والمقاسات مدمجة بجمالية */}
+                <div className="px-4 pb-3 grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => setGridSizeSelections(p => ({...p, [prod.id]: "small"}))} 
+                    className={`py-2 text-xs font-bold rounded-xl border transition ${
+                      currentSize === "small" 
+                        ? "bg-slate-900 text-white border-slate-900" 
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
                     {prod.smallUnitName}
                   </button>
-                  <button onClick={() => setGridSizeSelections(p => ({...p, [prod.id]: "large"}))} className={`py-2.5 text-sm font-black rounded-xl border ${currentSize === "large" ? "bg-slate-900 text-white" : "bg-white text-slate-700"}`}>
+                  <button 
+                    onClick={() => setGridSizeSelections(p => ({...p, [prod.id]: "large"}))} 
+                    className={`py-2 text-xs font-bold rounded-xl border transition ${
+                      currentSize === "large" 
+                        ? "bg-slate-900 text-white border-slate-900" 
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
                     {prod.largeUnitName}
                   </button>
                 </div>
 
-                <div className="p-5 pt-2 mt-auto border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <div className="flex flex-col">
-                    <span className="text-2xl font-black text-slate-950">{currentPrice} ج.م</span>
-                    <span className="text-xs text-slate-600 font-bold mt-1">
-                      {currentSize === "small" ? `لـ ${prod.smallUnitName}` : `لـ ${prod.largeUnitName}`}
-                    </span>
+                {/* السعر النهائي وزرار إضافة للسلة المطور الممتد كاملاً */}
+                <div className="p-4 pt-3 mt-auto border-t border-slate-100 flex flex-col gap-3 bg-slate-50/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500 font-bold">السعر المطلوب:</span>
+                    <div className="flex items-baseline gap-0.5">
+                      <span className="text-xl font-black text-slate-950">{currentPrice}</span>
+                      <span className="text-xs font-bold text-slate-700 mr-1">ج.م</span>
+                    </div>
                   </div>
 
                   <button
                     onClick={() => addToCart({ 
                       id: `${prod.id}-${currentSize}`, 
-                      nameAr: prod.nameAr, 
+                      nameAr: `${prod.nameAr} (${currentSize === "small" ? prod.smallUnitName : prod.largeUnitName})`, 
                       pricePerKG: currentPrice, 
                       category: "حلويات" 
                     })}
-                    className="w-11 h-11 rounded-xl flex items-center justify-center text-white"
+                    className="w-full py-3 rounded-xl flex items-center justify-center gap-2 text-white font-black text-xs shadow-sm hover:brightness-105 transition-all active:scale-[0.99]"
                     style={{ backgroundColor: accentColor }}
                   >
-                    <Plus className="w-6 h-6 stroke-[2.5]" />
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                    <span>أضف إلى السلة</span>
                   </button>
                 </div>
               </div>
@@ -231,7 +252,8 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                 <button
                   onClick={() => {
                     const pPrice = modalSizeSelection === "small" ? selectedProduct.smallUnitPrice : selectedProduct.largeUnitPrice;
-                    addToCart({ id: `${selectedProduct.id}-${modalSizeSelection}`, nameAr: selectedProduct.nameAr, pricePerKG: pPrice, category: "حلويات" });
+                    const pUnit = modalSizeSelection === "small" ? selectedProduct.smallUnitName : selectedProduct.largeUnitName;
+                    addToCart({ id: `${selectedProduct.id}-${modalSizeSelection}`, nameAr: `${selectedProduct.nameAr} (${pUnit})`, pricePerKG: pPrice, category: "حلويات" });
                     setSelectedProduct(null);
                   }}
                   className="py-4 px-8 text-white font-black rounded-2xl text-base" style={{ backgroundColor: accentColor }}
@@ -276,13 +298,14 @@ export default function StorefrontPage({ params }: StorefrontProps) {
               )}
             </div>
 
-            {/* فوتر السلة المحدث وحفظ بصمة المطور الفنية */}
+            {/* فوتر السلة المحدث والمزود بحقل العنوان للتوصيل الفوري */}
             <div className="p-6 border-t border-slate-200 bg-white space-y-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
               
               {cartItems.length > 0 && (
                 <div className="space-y-3 bg-slate-50 border border-slate-200 p-4 rounded-2xl">
-                  <h4 className="text-xs font-black text-slate-700 border-b border-slate-200 pb-1.5">بيانات العميل المستلم:</h4>
+                  <h4 className="text-xs font-black text-slate-700 border-b border-slate-200 pb-1.5">بيانات العميل المستلم والتوصيل:</h4>
                   
+                  {/* حقل الاسم */}
                   <div className="relative">
                     <span className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
                       <User className="w-4 h-4" />
@@ -296,6 +319,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                     />
                   </div>
 
+                  {/* حقل الموبايل */}
                   <div className="relative">
                     <span className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
                       <Phone className="w-4 h-4" />
@@ -307,6 +331,20 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       className="w-full pl-3 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 text-right focus:border-amber-500 focus:outline-none transition"
                       style={{ direction: "ltr" }}
+                    />
+                  </div>
+
+                  {/* ✨ حقل العنوان المضاف حديثاً بالتفصيل */}
+                  <div className="relative">
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                      <MapPin className="w-4 h-4" />
+                    </span>
+                    <input 
+                      type="text" 
+                      placeholder="عنوان التوصيل بالتفصيل (المنطقة/الشارع) *" 
+                      value={customerAddress}
+                      onChange={(e) => setCustomerAddress(e.target.value)}
+                      className="w-full pl-3 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:border-amber-500 focus:outline-none transition"
                     />
                   </div>
                 </div>
@@ -334,11 +372,17 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                     setCheckoutError("يرجى إدخال رقم موبايل صحيح مكون من 11 رقم!");
                     return;
                   }
+                  if (!customerAddress.trim() || customerAddress.trim().length < 5) {
+                    setCheckoutError("يرجى كتابة عنوان تفصيلي واضح لضمان وصول التوصيل!");
+                    return;
+                  }
                   setCheckoutError("");
-                  sendOrderWhatsApp(store?.whatsapp || "", store?.storeName || "", customerName, customerPhone);
+                  // تمرير العنوان كبارامتر خامس متاح للـ Context
+                  // sendOrderWhatsApp expects 5 args (whatsapp, storeName, customerName, customerPhone, customerAddress)
+                  sendOrderWhatsApp(store?.whatsapp || "", store?.storeName || "", customerName, customerPhone, customerAddress);
                 }} 
                 disabled={cartItems.length === 0 || !store?.whatsapp} 
-                className="w-full flex items-center justify-center gap-2 py-4 px-4 text-white font-black rounded-2xl text-lg shadow-md" 
+                className="w-full flex items-center justify-center gap-2 py-4 px-4 text-white font-black rounded-2xl text-lg shadow-md hover:brightness-105 active:scale-[0.99] transition" 
                 style={{ backgroundColor: store?.whatsapp ? "#25D366" : undefined }}
               >
                 <MessageSquare className="w-6 h-6 stroke-[2.5]" />
@@ -348,7 +392,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
               {/* 🏆 بصمة المطور المحترف في قاع السلة والصفحة */}
               <div className="text-center pt-2 text-[10px] font-bold text-slate-400 space-y-0.5">
                 <div>جميع الحقوق محفوظة © {new Date().getFullYear()} SweetHub</div>
-                <div>تم التطوير  بواسطة <span className="text-amber-600 font-black">Mohamed Abdelbaqy Ahmed </span></div>
+                <div>تم التطوير بواسطة <span className="text-amber-600 font-black">Mohamed Abdelbaqy Ahmed </span></div>
               </div>
 
             </div>
