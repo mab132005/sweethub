@@ -4,10 +4,9 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/firebase/config";
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc, updateDoc, writeBatch, DocumentData } from "firebase/firestore";
-import { Plus, Trash2, Edit2, Loader2, Link2, Download, Upload } from "lucide-react";
+import { Plus, Trash2, Edit2, Loader2, Link2, Download, Upload, Search } from "lucide-react"; // ✨ استيراد أيقونة الـ Search
 import * as XLSX from "xlsx";
 
-// 1. تعريف نوع المنتج داخل التطبيق
 interface CompactProduct {
   id: string;
   nameAr: string;
@@ -21,7 +20,6 @@ interface CompactProduct {
   conversionFactor: number;
 }
 
-// 2. تعريف واجهة البيانات المتوقعة القادمة من ملف الـ Excel لمنع الـ any
 interface ExcelProductRow {
   "اسم الصنف"?: string | number;
   "الاسم"?: string | number;
@@ -43,6 +41,9 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [btnLoading, setBtnLoading] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
+
+  // ✨ إضافة الـ State الخاصة بنص البحث في لوحة تحكم التاجر
+  const [searchQuery, setSearchQuery] = useState("");
 
   // حقول الفورم
   const [nameAr, setNameAr] = useState("");
@@ -75,7 +76,6 @@ export default function ProductsPage() {
         const prodItems: CompactProduct[] = [];
         
         prodSnapshot.forEach((document) => {
-          // استبدال الـ any بنوع DocumentData المدعوم من Firebase
           const d: DocumentData = document.data();
           prodItems.push({
             id: document.id,
@@ -101,6 +101,12 @@ export default function ProductsPage() {
     fetchData();
   }, [user]);
 
+  // ✨ فك وفلترة المنتجات ديناميكياً بحسب الاسم المدخل من التاجر
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery.trim()) return products;
+    return products.filter((p) => p.nameAr.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [searchQuery, products]);
+
   // ==================== ميزة استيراد المنتجات من ملف Excel ====================
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,7 +124,6 @@ export default function ProductsPage() {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         
-        // هنا حددنا النوع الصريح بدلاً من any[] لمنع خطأ الـ TypeScript
         const data = XLSX.utils.sheet_to_json<ExcelProductRow>(ws);
 
         const batch = writeBatch(db);
@@ -354,50 +359,74 @@ export default function ProductsPage() {
           </form>
         </div>
 
-        {/* الجدول وعرض البيانات */}
-        <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-300 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-start">
-              <thead className="bg-slate-100 border-b-2 border-slate-300 text-slate-900 text-sm">
-                <tr>
-                  <th className="p-4 text-start font-black text-slate-900 text-base">صورة</th>
-                  <th className="p-4 text-start font-black text-slate-900 text-base">المنتج</th>
-                  <th className="p-4 text-start font-black text-slate-900 text-base">الأسعار والتعبئة المحسوبة</th>
-                  <th className="p-4 text-center font-black text-slate-900 text-base">التحكم</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y-2 divide-slate-200 text-slate-950">
-                {products.length === 0 ? (
-                  <tr><td colSpan={4} className="p-8 text-center text-slate-500 font-bold">المتجر فارغ، ارفع ملف Excel أو أضف يدوياً وانطلق!</td></tr>
-                ) : (
-                  products.map((prod) => (
-                    <tr key={prod.id} className="hover:bg-slate-50 transition font-bold">
-                      <td className="p-4">
-                        <img src={prod.imageUrl || "https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=120&q=80"} alt="" className="w-14 h-14 rounded-xl object-cover border border-slate-300 shadow-sm" />
-                      </td>
-                      <td className="p-4">
-                        <div className="font-black text-slate-950 text-base">{prod.nameAr} {prod.bestSeller && "⭐"}</div>
-                      </td>
-                      <td className="p-4 space-y-1.5 text-sm">
-                        <div className="text-slate-950 font-bold"><span className="font-black text-slate-900">{prod.smallUnitName}:</span> {prod.smallUnitPrice} ج.م</div>
-                        <div className="text-slate-950 font-bold">
-                          <span className="font-black text-slate-900">{prod.largeUnitName}:</span> {prod.largeUnitPrice} ج.م 
-                          <span className="text-xs bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md mr-2 font-black inline-block shadow-sm">
-                            (تحتوي على {prod.conversionFactor} {prod.smallUnitName})
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4 flex items-center justify-center gap-3 mt-3">
-                        <button onClick={() => handleEdit(prod)} className="p-2.5 text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition"><Edit2 className="w-4 h-4 stroke-[2.5]" /></button>
-                        <button onClick={() => handleDelete(prod.id)} className="p-2.5 text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-xl transition"><Trash2 className="w-4 h-4 stroke-[2.5]" /></button>
+        {/* الجدول وعرض البيانات المضاف إليه مربع البحث */}
+        <div className="xl:col-span-2 space-y-4">
+          
+          {/* 🔍 صندوق البحث الذكي المخصص للتاجر بداخل الـ Dashboard */}
+          <div className="bg-white p-2 rounded-xl border border-slate-300 shadow-sm relative flex items-center">
+            <Search className="w-4 h-4 text-slate-400 absolute right-4 stroke-[2.5]" />
+            <input 
+              type="text" 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              placeholder="البحث السريع عن منتج بالاسم بداخل المتجر..." 
+              className="w-full pr-10 pl-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white transition" 
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute left-4 text-xs font-black text-slate-400 hover:text-slate-600 bg-slate-200/60 px-2 py-1 rounded-md">تصفية ✕</button>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-300 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-start">
+                <thead className="bg-slate-100 border-b-2 border-slate-300 text-slate-900 text-sm">
+                  <tr>
+                    <th className="p-4 text-start font-black text-slate-900 text-base">صورة</th>
+                    <th className="p-4 text-start font-black text-slate-900 text-base">المنتج</th>
+                    <th className="p-4 text-start font-black text-slate-900 text-base">الأسعار والتعبئة المحسوبة</th>
+                    <th className="p-4 text-center font-black text-slate-900 text-base">التحكم</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y-2 divide-slate-200 text-slate-950">
+                  {filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-slate-500 font-bold">
+                        {products.length === 0 ? "المتجر فارغ، ارفع ملف Excel أو أضف يدوياً وانطلق!" : "لا توجد نتائج تطابق بحثك الحالي! 🔍"}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredProducts.map((prod) => (
+                      <tr key={prod.id} className="hover:bg-slate-50 transition font-bold">
+                        <td className="p-4">
+                          <img src={prod.imageUrl || "https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=120&q=80"} alt="" className="w-14 h-14 rounded-xl object-cover border border-slate-300 shadow-sm" />
+                        </td>
+                        <td className="p-4">
+                          <div className="font-black text-slate-950 text-base">{prod.nameAr} {prod.bestSeller && "⭐"}</div>
+                        </td>
+                        <td className="p-4 space-y-1.5 text-sm">
+                          <div className="text-slate-950 font-bold"><span className="font-black text-slate-900">{prod.smallUnitName}:</span> {prod.smallUnitPrice} ج.م</div>
+                          <div className="text-slate-950 font-bold">
+                            <span className="font-black text-slate-900">{prod.largeUnitName}:</span> {prod.largeUnitPrice} ج.م 
+                            <span className="text-xs bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md mr-2 font-black inline-block shadow-sm">
+                              (تحتوي على {prod.conversionFactor} {prod.smallUnitName})
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4 flex items-center justify-center gap-3 mt-3">
+                          <button onClick={() => handleEdit(prod)} className="p-2.5 text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition"><Edit2 className="w-4 h-4 stroke-[2.5]" /></button>
+                          <button onClick={() => handleDelete(prod.id)} className="p-2.5 text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-xl transition"><Trash2 className="w-4 h-4 stroke-[2.5]" /></button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
+
         </div>
+
       </div>
     </div>
   );
