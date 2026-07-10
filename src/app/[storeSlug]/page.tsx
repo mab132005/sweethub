@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, doc, updateDoc, increment } from "fi
 import { Store } from "@/types";
 import { useCart } from "@/context/CartContext";
 import NextImage from "next/image";
-import { ShoppingCart, Plus, Minus, Trash2, Loader2, Search, MessageSquare, User, Phone, AlertCircle, MapPin } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, Loader2, Search, MessageSquare, User, Phone, AlertCircle, MapPin, CheckCircle, XCircle } from "lucide-react";
 
 interface StorefrontProps {
   params: Promise<{ storeSlug: string }>;
@@ -68,7 +68,8 @@ export default function StorefrontPage({ params }: StorefrontProps) {
 
         await updateDoc(doc(db, "stores", storeDoc.id), { views: increment(1) });
 
-        const prodQ = query(collection(db, "products"), where("storeId", "==", storeDoc.id), where("availability", "==", true));
+        // جلب جميع المنتجات وعرض حالة التوفر بناءً على حقل availability
+        const prodQ = query(collection(db, "products"), where("storeId", "==", storeDoc.id));
         const prodSnapshot = await getDocs(prodQ);
         const prodItems: MultiSizeProduct[] = [];
 
@@ -116,11 +117,13 @@ export default function StorefrontPage({ params }: StorefrontProps) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24" style={{ direction: "rtl" }}>
       
-      {/* هيدر متجاوب ومريح جداً للعين */}
+      {/* 👑 هيدر مطور يعرض الاسم بالكامل بدون قطع ومناسب للشاشات الصغيرة */}
       <header className="bg-white/90 backdrop-blur-md border-b border-slate-100 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 truncate max-w-[70%]">{store.storeName}</h1>
-          <button onClick={() => setIsCartOpen(true)} className="relative p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 transition">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <h1 className="text-base md:text-xl font-black text-slate-900 leading-tight flex-1 break-words">
+            {store.storeName}
+          </h1>
+          <button onClick={() => setIsCartOpen(true)} className="relative p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 transition shrink-0">
             <ShoppingCart className="w-5 h-5 text-slate-800" />
             {cartItems.length > 0 && (
               <span className="absolute -top-1.5 -end-1.5 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm" style={{ backgroundColor: accentColor }}>
@@ -138,60 +141,75 @@ export default function StorefrontPage({ params }: StorefrontProps) {
           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="ابحث عن حلوياتك المفضلة هنا..." className="w-full pr-10 pl-3 py-2.5 bg-slate-50 rounded-lg text-sm font-bold placeholder:text-slate-400 focus:outline-none" />
         </div>
 
-        {/* 📱 شبكة عرض المنتجات: تم ضبط grid-cols-2 للموبايل و تم تقليص الـ gap لتوفير مساحة فخمة للصور */}
+        {/* شبكة عرض المنتجات المتجاوبة */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
           {filteredProducts.map((prod) => {
             const currentSize = gridSizeSelections[prod.id] || "small";
             const currentPrice = currentSize === "small" ? prod.smallUnitPrice : prod.largeUnitPrice;
+            const isAvailable = prod.availability; // حالة التوفر
 
             return (
-              <div key={prod.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition duration-200 flex flex-col overflow-hidden border border-slate-200/60 group relative">
+              <div key={prod.id} className={`bg-white rounded-2xl shadow-sm hover:shadow-md transition duration-200 flex flex-col overflow-hidden border border-slate-200/60 group relative ${!isAvailable ? "opacity-75" : ""}`}>
                 
-                {/* شارة الأكثر مبيعاً إذا وجدت */}
-                {prod.bestSeller && (
+                {/* شارة التميز أو الأكثر مبيعاً */}
+                {prod.bestSeller && isAvailable && (
                   <span className="absolute top-2 right-2 z-10 bg-amber-500 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-md shadow-sm">✨ مميز</span>
                 )}
 
-                <div onClick={() => { setSelectedProduct(prod); setModalSizeSelection(currentSize); }} className="cursor-pointer">
+                <div onClick={() => { if(isAvailable) { setSelectedProduct(prod); setModalSizeSelection(currentSize); } }} className={`relative ${isAvailable ? "cursor-pointer" : "cursor-not-allowed"}`}>
                   <div className="relative aspect-[4/3] w-full bg-slate-100 overflow-hidden">
                     <NextImage 
                       src={prod.imageUrl || "https://images.unsplash.com/photo-1511018556340-d16986a1c194?auto=format&fit=crop&w=600&q=80"} 
                       alt={prod.nameAr} 
                       fill 
                       unoptimized
-                      className="object-cover group-hover:scale-105 transition duration-300"
+                      className={`object-cover transition duration-300 ${isAvailable ? "group-hover:scale-105" : "grayscale"}`}
                     />
                   </div>
                   <div className="p-3 pb-1">
+                    {/* 🟢 شارة حالة توفر المنتج مدمجة بشكل فني أعلى الاسم */}
+                    <div className="mb-1 flex items-center gap-1">
+                      {isAvailable ? (
+                        <span className="inline-flex items-center text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                          <CheckCircle className="w-2.5 h-2.5 left-0.5 ml-0.5 stroke-[3]" /> متوفر
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-[9px] font-black text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                          <XCircle className="w-2.5 h-2.5 left-0.5 ml-0.5 stroke-[3]" /> مخلص / غير متوفر
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-sm md:text-base font-black text-slate-900 line-clamp-1 group-hover:text-amber-600 transition">{prod.nameAr}</h3>
                   </div>
                 </div>
 
-                {/* أزرار اختيار الأحجام: مدمجة وأنيقة جداً للموبايل بتصميم تابس */}
+                {/* أزرار اختيار الأحجام والمقاسات تابس */}
                 <div className="px-3 pb-2 grid grid-cols-2 gap-1.5 mt-2">
                   <button 
+                    disabled={!isAvailable}
                     onClick={() => setGridSizeSelections(p => ({...p, [prod.id]: "small"}))} 
                     className={`py-1.5 text-[11px] font-bold rounded-lg border transition ${
-                      currentSize === "small" 
+                      currentSize === "small" && isAvailable
                         ? "bg-slate-950 text-white border-slate-950 shadow-sm" 
-                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 disabled:opacity-50"
                     }`}
                   >
                     {prod.smallUnitName}
                   </button>
                   <button 
+                    disabled={!isAvailable}
                     onClick={() => setGridSizeSelections(p => ({...p, [prod.id]: "large"}))} 
                     className={`py-1.5 text-[11px] font-bold rounded-lg border transition ${
-                      currentSize === "large" 
+                      currentSize === "large" && isAvailable
                         ? "bg-slate-950 text-white border-slate-950 shadow-sm" 
-                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 disabled:opacity-50"
                     }`}
                   >
                     {prod.largeUnitName}
                   </button>
                 </div>
 
-                {/* السعر النهائي وزرار السلة الممتد والمنسق بالكامل بـ Flex Column لضمان عدم تداخل النصوص */}
+                {/* السعر وبوتون الأكشن المقفل في حالة عدم التوفر */}
                 <div className="p-3 pt-2 mt-auto border-t border-slate-100 bg-slate-50/60 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-slate-400 font-bold">السعر:</span>
@@ -202,17 +220,18 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                   </div>
 
                   <button
+                    disabled={!isAvailable}
                     onClick={() => addToCart({ 
                       id: `${prod.id}-${currentSize}`, 
                       nameAr: `${prod.nameAr} (${currentSize === "small" ? prod.smallUnitName : prod.largeUnitName})`, 
                       pricePerKG: currentPrice, 
                       category: "حلويات" 
                     })}
-                    className="w-full py-2.5 rounded-xl flex items-center justify-center gap-1 text-white font-black text-xs shadow-sm hover:brightness-105 active:scale-[0.96] transition-all duration-150"
-                    style={{ backgroundColor: accentColor }}
+                    className="w-full py-2.5 rounded-xl flex items-center justify-center gap-1 text-white font-black text-xs shadow-sm hover:brightness-105 active:scale-[0.96] transition-all duration-150 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed disabled:shadow-none"
+                    style={{ backgroundColor: isAvailable ? accentColor : undefined }}
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>أضف للسلة</span>
+                    <span>{isAvailable ? "أضف للسلة" : "غير متوفر حالياً"}</span>
                   </button>
                 </div>
               </div>
@@ -273,7 +292,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
         </div>
       )}
 
-      {/* سلة المشتريات الجانبية المحدثة المتجاوبة بالكامل مع الموبايل */}
+      {/* سلة المشتريات الجانبية */}
       {isCartOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-end">
           <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between md:rounded-l-3xl overflow-hidden">
@@ -305,14 +324,13 @@ export default function StorefrontPage({ params }: StorefrontProps) {
               )}
             </div>
 
-            {/* فوتر السلة المحدث والمزود بحقل العنوان للتوصيل الفوري */}
+            {/* فوتر السلة مع الحقول */}
             <div className="p-4 border-t border-slate-200 bg-white space-y-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
               
               {cartItems.length > 0 && (
                 <div className="space-y-2.5 bg-slate-50 border border-slate-200/60 p-3 rounded-xl">
                   <h4 className="text-[11px] font-black text-slate-600 border-b border-slate-200/60 pb-1.5">بيانات العميل المستلم والتوصيل:</h4>
                   
-                  {/* حقل الاسم */}
                   <div className="relative">
                     <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
                       <User className="w-3.5 h-3.5" />
@@ -326,7 +344,6 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                     />
                   </div>
 
-                  {/* حقل الموبايل */}
                   <div className="relative">
                     <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
                       <Phone className="w-3.5 h-3.5" />
@@ -341,7 +358,6 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                     />
                   </div>
 
-                  {/* حقل العنوان */}
                   <div className="relative">
                     <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
                       <MapPin className="w-3.5 h-3.5" />
@@ -394,7 +410,6 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                 <span>إتمام الطلب عبر واتساب</span>
               </button>
 
-              {/* توقيع المطور الرسمي في قاع الصفحة والسلة */}
               <div className="text-center pt-1 text-[9px] font-bold text-slate-400 space-y-0.5">
                 <div>جميع الحقوق محفوظة © {new Date().getFullYear()} SweetHub</div>
                 <div>تم التطوير بواسطة <span className="text-amber-600 font-black">Mohamed Abdelbaqy Ahmed</span></div>
