@@ -117,7 +117,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-24" style={{ direction: "rtl" }}>
       
-      {/* 👑 هيدر مطور يعرض الاسم بالكامل بدون قطع ومناسب للشاشات الصغيرة */}
+      {/* الهيدر المتجاوب */}
       <header className="bg-white/90 backdrop-blur-md border-b border-slate-100 sticky top-0 z-20 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <h1 className="text-base md:text-xl font-black text-slate-900 leading-tight flex-1 break-words">
@@ -146,12 +146,12 @@ export default function StorefrontPage({ params }: StorefrontProps) {
           {filteredProducts.map((prod) => {
             const currentSize = gridSizeSelections[prod.id] || "small";
             const currentPrice = currentSize === "small" ? prod.smallUnitPrice : prod.largeUnitPrice;
-            const isAvailable = prod.availability; // حالة التوفر
+            const isAvailable = prod.availability;
 
             return (
               <div key={prod.id} className={`bg-white rounded-2xl shadow-sm hover:shadow-md transition duration-200 flex flex-col overflow-hidden border border-slate-200/60 group relative ${!isAvailable ? "opacity-75" : ""}`}>
                 
-                {/* شارة التميز أو الأكثر مبيعاً */}
+                {/* شارة التميز */}
                 {prod.bestSeller && isAvailable && (
                   <span className="absolute top-2 right-2 z-10 bg-amber-500 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-md shadow-sm">✨ مميز</span>
                 )}
@@ -167,7 +167,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                     />
                   </div>
                   <div className="p-3 pb-1">
-                    {/* 🟢 شارة حالة توفر المنتج مدمجة بشكل فني أعلى الاسم */}
+                    {/* شارة توفر المنتج */}
                     <div className="mb-1 flex items-center gap-1">
                       {isAvailable ? (
                         <span className="inline-flex items-center text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
@@ -209,7 +209,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                   </button>
                 </div>
 
-                {/* السعر وبوتون الأكشن المقفل في حالة عدم التوفر */}
+                {/* السعر وبوتون إضافة للسلة */}
                 <div className="p-3 pt-2 mt-auto border-t border-slate-100 bg-slate-50/60 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-slate-400 font-bold">السعر:</span>
@@ -274,7 +274,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
               </div>
 
               <div className="p-6 border-t border-slate-200 bg-slate-50 flex items-center justify-between mt-auto">
-                <span className="text-3xl font-black text-slate-950">{modalSizeSelection === "small" ? selectedProduct.smallUnitPrice : selectedProduct.largeUnitPrice} ج.م</span>
+                <span className="text-3xl font-black text-slate-950">{modalSizeSelection === "small" ? selectedProduct.smallUnitPrice : selectedProduct.largeUnitPrice} ج.m</span>
                 <button
                   onClick={() => {
                     const pPrice = modalSizeSelection === "small" ? selectedProduct.smallUnitPrice : selectedProduct.largeUnitPrice;
@@ -400,7 +400,15 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                     return;
                   }
                   setCheckoutError("");
-                  sendOrderWhatsApp(store?.whatsapp || "", store?.storeName || "", customerName, customerPhone, customerAddress);
+                  // ✨ تم الإصلاح: تمرير المعرّف الفريد للمحل كعنصر سادس وأخير للدالة
+                  sendOrderWhatsApp(
+                    store?.whatsapp || "", 
+                    store?.storeName || "", 
+                    customerName, 
+                    customerPhone, 
+                    customerAddress,
+                    store?.id || ""
+                  );
                 }} 
                 disabled={cartItems.length === 0 || !store?.whatsapp} 
                 className="w-full flex items-center justify-center gap-2 py-3.5 px-4 text-white font-black rounded-xl text-base shadow-md hover:brightness-105 active:scale-[0.97] transition duration-150" 

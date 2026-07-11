@@ -17,8 +17,8 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   getCartSubtotal: () => number;
-  // ✅ التعديل 1: إضافة البارامتر الخامس هنا في الـ Interface
-  sendOrderWhatsApp: (whatsappNumber: string, storeName: string, customerName: string, customerPhone: string, customerAddress: string) => void;
+  // 🎉 التعديل: إضافة البارامتر السادس storeId هنا في الـ Interface
+  sendOrderWhatsApp: (whatsappNumber: string, storeName: string, customerName: string, customerPhone: string, customerAddress: string, storeId: string) => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -72,10 +72,45 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return cartItems.reduce((total, item) => total + item.pricePerKG * item.quantity, 0);
   };
 
-  // ✅ التعديل 2: استقبال البارامتر الخامس هنا في جسم الدالة الفعلي
-  const sendOrderWhatsApp = (whatsappNumber: string, storeName: string, customerName: string, customerPhone: string, customerAddress: string) => {
+  // 🚀 رفع الطلب للداتابيز ثم فتح الواتساب مجمعين
+  const sendOrderWhatsApp = async (
+    whatsappNumber: string, 
+    storeName: string, 
+    customerName: string, 
+    customerPhone: string, 
+    customerAddress: string,
+    storeId: string
+  ) => {
     if (cartItems.length === 0) return;
 
+    try {
+      // 1. صياغة أوبجكت الأوردر المتكامل
+      const orderData = {
+        storeId: storeId,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        customerAddress: customerAddress,
+        items: cartItems.map(item => ({
+          id: item.id,
+          nameAr: item.nameAr,
+          price: item.pricePerKG,
+          quantity: item.quantity
+        })),
+        totalPrice: getCartSubtotal(),
+        status: "pending", // الحالات المتاحة: pending, preparing, delivered, cancelled
+        createdAt: new Date()
+      };
+
+      // 2. الحفظ المباشر بـ Firestore
+      const { collection, addDoc } = await import("firebase/firestore");
+      const { db } = await import("@/firebase/config");
+      await addDoc(collection(db, "orders"), orderData);
+
+    } catch (error) {
+      console.error("Error saving order to Firestore:", error);
+    }
+
+    // 3. فتح الواتساب للعميل
     let message = `*طلب جديد من متجر: ${storeName}*\n`;
     message += `--------------------------------\n`;
     message += `👤 *بيانات الزبون والتوصيل:*\n`;
@@ -103,6 +138,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const whatsappURL = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
     window.open(whatsappURL, "_blank");
+    clearCart(); // مسح السلة بعد الخروج للواتساب
   };
 
   return (
