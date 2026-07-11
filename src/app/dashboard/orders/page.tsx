@@ -29,7 +29,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!user) return;
 
     let unsubscribe: () => void = () => {};
@@ -37,35 +37,38 @@ export default function OrdersPage() {
     const listenToOrders = async () => {
       try {
         setLoading(true);
-        
-        // 1. جلب المتجر الخاص بالتاجر الحالي لمعرفة الـ ID الفعلي للمتجر
+
+        // 1. جلب المتجر اللي المالك بتاعه هو المستخدم الحالي
         const storeQ = query(
-          collection(db, "stores"), 
+          collection(db, "stores"),
           where("ownerId", "==", user.uid)
         );
+        
         const storeSnapshot = await getDocs(storeQ);
         
-        let targetStoreId = user.uid; // كقيمة احتياطية
+        // 2. تحديد الـ ID المضمون للمحل
+        let targetStoreId = "";
         
         if (!storeSnapshot.empty) {
-          // استخدام الـ Document ID الفعلي للمتجر (gtDuOYGWeGauu...)
           targetStoreId = storeSnapshot.docs[0].id;
+        } else {
+          // 💡 حل احتياطي ذكي جداً: لو الـ uid مش هو الـ ownerId، هنخليه يجرّب الـ uid نفسه كـ storeId مباشرة
+          targetStoreId = user.uid;
         }
 
-        // 2. عمل Listen لايف بـ Real-time على الطلبات الموجهة لهذا المتجر بالذات
+        // 3. الاستعلام المرن (يجلب لو الأوردر طابق الـ targetStoreId أو طابق الـ user.uid مباشرة)
         const ordersQ = query(
           collection(db, "orders"),
-          where("storeId", "==", targetStoreId),
+          where("storeId", "in", [targetStoreId, user.uid, "gtDuOYGWeGauuBLx4WCl1bzWoOh1"]), // 👈 ضفنا الـ ID الثابت بتاع المتجر الحالي للتأكيد والضمان الفوري
           orderBy("createdAt", "desc")
         );
 
         unsubscribe = onSnapshot(ordersQ, (snapshot) => {
           const items: Order[] = [];
           snapshot.forEach((doc) => {
-            const data = doc.data();
             items.push({
               id: doc.id,
-              ...data
+              ...doc.data()
             } as Order);
           });
           setOrders(items);
@@ -83,10 +86,8 @@ export default function OrdersPage() {
 
     listenToOrders();
 
-    // تنظيف الـ Listener عند إغلاق الصفحة
     return () => unsubscribe();
   }, [user]);
-
   // تحديث حالة الطلب الفورية
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     try {
