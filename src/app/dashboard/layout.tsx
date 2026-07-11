@@ -9,7 +9,8 @@ import {
   ShoppingBag, 
   Settings, 
   LogOut as LogOutIcon, 
-  Loader2 
+  Loader2,
+  ClipboardList // 🎉 استيراد أيقونة الطلبات
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -20,9 +21,11 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
 
+  // ✨ إضافة تبويب "الطلبات الواردة" ليتحدث في الكمبيوتر والموبايل معاً
   const navigationItems = [
     { name: "الرئيسية", href: "/dashboard", icon: LayoutDashboard },
     { name: "المنتجات", href: "/dashboard/products", icon: ShoppingBag },
+    { name: "الطلبات الواردة", href: "/dashboard/orders", icon: ClipboardList }, // 🎉 الخيار الجديد
     { name: "الإعدادات", href: "/dashboard/settings", icon: Settings },
   ];
 
@@ -90,15 +93,14 @@ export default function DashboardLayout({
             <span>تسجيل الخروج</span>
           </button>
           
-          {/* حقوق المطور منورة في الـ Sidebar للكمبيوتر */}
           <div className="text-[10px] font-bold text-slate-500 text-center border-t border-slate-800/60 pt-2">
-          تم تطوير بواسطة <span className="text-amber-500 font-black"> Mohamed Abdelbaqy Ahmed</span>
+            تم تطوير بواسطة <span className="text-amber-500 font-black"> Mohamed Abdelbaqy Ahmed</span>
           </div>
         </div>
       </aside>
 
       {/* 📱 الـ Bottom Navigation المخصص للموبايل فقط (يختفي على الكمبيوتر) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex items-center justify-around z-40 shadow-xl">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-1 py-2 flex items-center justify-around z-40 shadow-xl">
         {navigationItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -107,23 +109,22 @@ export default function DashboardLayout({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all duration-150 ${
+              className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all duration-150 ${
                 isActive ? "text-amber-500 font-black" : "text-slate-400"
               }`}
             >
               <Icon className="w-5 h-5" />
-              <span className="text-[11px] font-black">{item.name}</span>
+              <span className="text-[10px] font-black">{item.name}</span>
             </Link>
           );
         })}
         
-        {/* زرار تسجيل الخروج للموبايل */}
         <button
           onClick={logout}
-          className="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-rose-400"
+          className="flex flex-col items-center gap-1 py-1 px-2 rounded-xl text-rose-400"
         >
           <LogOutIcon className="w-5 h-5" />
-          <span className="text-[11px] font-black">خروج</span>
+          <span className="text-[10px] font-black">خروج</span>
         </button>
       </div>
 
@@ -133,7 +134,6 @@ export default function DashboardLayout({
           {children}
         </div>
         
-        {/* توقيع المطور للموبايل يظهر في نهاية المحتوى */}
         <div className="md:hidden text-center pb-6 text-[10px] font-bold text-slate-400">
           تم التطوير بواسطة <span className="text-amber-600 font-black"> Mohamed Abdelbaqy Ahmed</span>
         </div>
