@@ -1,6 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+// 🟢 استيراد دوال الفايربيز بشكل صريح ومباشر في أعلى الملف لمنع أي كراش
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "@/firebase/config";
 
 export interface CartItem {
   id: string;
@@ -17,7 +20,6 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   getCartSubtotal: () => number;
-  // 🎉 التعديل: إضافة البارامتر السادس storeId هنا في الـ Interface
   sendOrderWhatsApp: (whatsappNumber: string, storeName: string, customerName: string, customerPhone: string, customerAddress: string, storeId: string) => Promise<void>;
 }
 
@@ -72,7 +74,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return cartItems.reduce((total, item) => total + item.pricePerKG * item.quantity, 0);
   };
 
-  // 🚀 رفع الطلب للداتابيز ثم فتح الواتساب مجمعين
+  // 🚀 الدالة المحدثة والمضمونة بنسبة 100%
   const sendOrderWhatsApp = async (
     whatsappNumber: string, 
     storeName: string, 
@@ -84,7 +86,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (cartItems.length === 0) return;
 
     try {
-      // 1. صياغة أوبجكت الأوردر المتكامل
+      // 1. تجهيز أوبجكت الأوردر
       const orderData = {
         storeId: storeId,
         customerName: customerName,
@@ -97,20 +99,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           quantity: item.quantity
         })),
         totalPrice: getCartSubtotal(),
-        status: "pending", // الحالات المتاحة: pending, preparing, delivered, cancelled
+        status: "pending",
         createdAt: new Date()
       };
 
-      // 2. الحفظ المباشر بـ Firestore
-      const { collection, addDoc } = await import("firebase/firestore");
-      const { db } = await import("@/firebase/config");
+      // 2. الحفظ المباشر والسريع في Firestore
       await addDoc(collection(db, "orders"), orderData);
 
     } catch (error) {
       console.error("Error saving order to Firestore:", error);
     }
 
-    // 3. فتح الواتساب للعميل
+    // 3. بناء رسالة الواتساب وفتح الرابط
     let message = `*طلب جديد من متجر: ${storeName}*\n`;
     message += `--------------------------------\n`;
     message += `👤 *بيانات الزبون والتوصيل:*\n`;
@@ -138,7 +138,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const whatsappURL = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
     window.open(whatsappURL, "_blank");
-    clearCart(); // مسح السلة بعد الخروج للواتساب
+    clearCart();
   };
 
   return (
