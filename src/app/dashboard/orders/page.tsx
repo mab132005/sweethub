@@ -29,65 +29,65 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
- useEffect(() => {
+useEffect(() => {
     if (!user) return;
 
-    let unsubscribe: () => void = () => {};
+    // 1. استعلام مباشر وبسيط على كوليكشن الأوردرات كامل مرتب تنازلياً (لا يحتاج Index)
+    const ordersQ = query(
+      collection(db, "orders"),
+      orderBy("createdAt", "desc")
+    );
 
-    const listenToOrders = async () => {
+    // 2. عمل الاستماع المباشر (Real-time listener)
+    const unsubscribe = onSnapshot(ordersQ, async (snapshot) => {
       try {
         setLoading(true);
 
-        // 1. جلب المتجر اللي المالك بتاعه هو المستخدم الحالي
+        // جلب معرفات المتجر الخاص بالتاجر الحالي
         const storeQ = query(
           collection(db, "stores"),
           where("ownerId", "==", user.uid)
         );
-        
         const storeSnapshot = await getDocs(storeQ);
         
-        // 2. تحديد الـ ID المضمون للمحل
-        let targetStoreId = "";
-        
+        let myStoreId = "";
         if (!storeSnapshot.empty) {
-          targetStoreId = storeSnapshot.docs[0].id;
-        } else {
-          // 💡 حل احتياطي ذكي جداً: لو الـ uid مش هو الـ ownerId، هنخليه يجرّب الـ uid نفسه كـ storeId مباشرة
-          targetStoreId = user.uid;
+          myStoreId = storeSnapshot.docs[0].id;
         }
 
-        // 3. الاستعلام المرن (يجلب لو الأوردر طابق الـ targetStoreId أو طابق الـ user.uid مباشرة)
-        const ordersQ = query(
-          collection(db, "orders"),
-          where("storeId", "in", [targetStoreId, user.uid, "gtDuOYGWeGauuBLx4WCl1bzWoOh1"]), // 👈 ضفنا الـ ID الثابت بتاع المتجر الحالي للتأكيد والضمان الفوري
-          orderBy("createdAt", "desc")
-        );
+        const items: Order[] = [];
+        
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          
+          // 3. الفلترة الذكية داخل الكود لمنع أي مشاكل Indexing أو تعارض في الـ IDs
+          const isMyOrder = 
+            data.storeId === myStoreId || 
+            data.storeId === user.uid || 
+            data.storeId === "gtDuOYGWeGauuBLx4WCl1bzWoOh1"; // الـ ID الثابت لمتجرك الحالي
 
-        unsubscribe = onSnapshot(ordersQ, (snapshot) => {
-          const items: Order[] = [];
-          snapshot.forEach((doc) => {
+          if (isMyOrder) {
             items.push({
               id: doc.id,
-              ...doc.data()
+              ...data
             } as Order);
-          });
-          setOrders(items);
-          setLoading(false);
-        }, (error) => {
-          console.error("Error listening to orders:", error);
-          setLoading(false);
+          }
         });
 
-      } catch (error) {
-        console.error("Error in orders setup:", error);
+        setOrders(items);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error processing orders:", err);
         setLoading(false);
       }
-    };
-
-    listenToOrders();
+    }, (error) => {
+      console.error("Error listening to orders:", error);
+      setLoading(false);
+    });
 
     return () => unsubscribe();
   }, [user]);
+  
   // تحديث حالة الطلب الفورية
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     try {
