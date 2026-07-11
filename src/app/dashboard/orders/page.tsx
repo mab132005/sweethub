@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/firebase/config";
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, getDocs } from "firebase/firestore";
 import { Loader2, ClipboardList, User, Phone, MapPin, Clock, ShoppingBag } from "lucide-react";
 
 interface OrderItem {
@@ -32,29 +32,58 @@ export default function OrdersPage() {
   useEffect(() => {
     if (!user) return;
 
-    // قراءة الأوردرات بـ Real-time عبر listen (onSnapshot) لسرعة الأداء والكفاءة
-    const ordersQ = query(
-      collection(db, "orders"),
-      where("storeId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
+    let unsubscribe: () => void = () => {};
 
-    const unsubscribe = onSnapshot(ordersQ, (snapshot) => {
-      const items: Order[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        items.push({
-          id: doc.id,
-          ...data
-        } as Order);
-      });
-      setOrders(items);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching orders:", error);
-      setLoading(false);
-    });
+    const listenToOrders = async () => {
+      try {
+        setLoading(true);
+        
+        // 1. جلب المتجر الخاص بالتاجر الحالي لمعرفة الـ ID الفعلي للمتجر
+        const storeQ = query(
+          collection(db, "stores"), 
+          where("ownerId", "==", user.uid)
+        );
+        const storeSnapshot = await getDocs(storeQ);
+        
+        let targetStoreId = user.uid; // كقيمة احتياطية
+        
+        if (!storeSnapshot.empty) {
+          // استخدام الـ Document ID الفعلي للمتجر (gtDuOYGWeGauu...)
+          targetStoreId = storeSnapshot.docs[0].id;
+        }
 
+        // 2. عمل Listen لايف بـ Real-time على الطلبات الموجهة لهذا المتجر بالذات
+        const ordersQ = query(
+          collection(db, "orders"),
+          where("storeId", "==", targetStoreId),
+          orderBy("createdAt", "desc")
+        );
+
+        unsubscribe = onSnapshot(ordersQ, (snapshot) => {
+          const items: Order[] = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            items.push({
+              id: doc.id,
+              ...data
+            } as Order);
+          });
+          setOrders(items);
+          setLoading(false);
+        }, (error) => {
+          console.error("Error listening to orders:", error);
+          setLoading(false);
+        });
+
+      } catch (error) {
+        console.error("Error in orders setup:", error);
+        setLoading(false);
+      }
+    };
+
+    listenToOrders();
+
+    // تنظيف الـ Listener عند إغلاق الصفحة
     return () => unsubscribe();
   }, [user]);
 
