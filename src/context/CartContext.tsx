@@ -74,7 +74,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return cartItems.reduce((total, item) => total + item.pricePerKG * item.quantity, 0);
   };
 
-  // 🚀 الدالة المحدثة والمضمونة بنسبة 100%
+  // 🚀 الدالة المحدثة والمضمونة بنسبة 100% مع صائد الأخطاء المرئي
   const sendOrderWhatsApp = async (
     whatsappNumber: string, 
     storeName: string, 
@@ -86,12 +86,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (cartItems.length === 0) return;
 
     try {
-      // 1. تجهيز أوبجكت الأوردر
+      // 1. تجهيز أوبجكت الأوردر وتأمين الحقول منعاً لأي قيمة غير معرفة
       const orderData = {
-        storeId: storeId,
-        customerName: customerName,
-        customerPhone: customerPhone,
-        customerAddress: customerAddress,
+        storeId: storeId || "unknown_store",
+        customerName: customerName || "عميل غير مسمى",
+        customerPhone: customerPhone || "بدون رقم",
+        customerAddress: customerAddress || "بدون عنوان",
         items: cartItems.map(item => ({
           id: item.id,
           nameAr: item.nameAr,
@@ -105,9 +105,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       // 2. الحفظ المباشر والسريع في Firestore
       await addDoc(collection(db, "orders"), orderData);
+      console.log("🎉 Order saved to Firestore successfully!");
 
     } catch (error) {
       console.error("Error saving order to Firestore:", error);
+      // 🚨 تنبيه منبثق فوري يطبع نص الخطأ الفعلي القادم من السيرفر على شاشتك
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`⚠️ خطأ في حفظ الطلب بالداتابيز: ${errorMessage}`);
     }
 
     // 3. بناء رسالة الواتساب وفتح الرابط

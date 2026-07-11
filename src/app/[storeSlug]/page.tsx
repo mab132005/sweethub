@@ -407,7 +407,7 @@ export default function StorefrontPage({ params }: StorefrontProps) {
                     customerName, 
                     customerPhone, 
                     customerAddress,
-                    store?.id || ""
+                    store?.id || storeSlug || "unknown_store"
                   );
                 }} 
                 disabled={cartItems.length === 0 || !store?.whatsapp} 
