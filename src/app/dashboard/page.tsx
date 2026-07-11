@@ -1,120 +1,212 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/firebase/config";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { Store } from "@/types";
-import { useLanguage } from "@/context/LanguageContext";
-import { Eye, ShoppingBag, FolderOpen, Heart } from "lucide-react";
+import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
+import { 
+  Eye, 
+  ShoppingBag, 
+  FolderHeart, 
+  Heart, 
+  ClipboardList, 
+  DollarSign, 
+  Store 
+} from "lucide-react";
 
-export default function DashboardOverview() {
+interface DashboardStats {
+  views: number;
+  productsCount: number;
+  categoriesCount: number;
+  favoritesCount: number;
+  activeOrdersCount: number;
+  totalSales: number;
+}
+
+export default function DashboardPage() {
   const { user } = useAuth();
-  const { locale } = useLanguage();
-  const [store, setStore] = useState<Store | null>(null);
-  const [stats, setStats] = useState({ productsCount: 0, categoriesCount: 0 });
+  const [storeName, setStoreName] = useState("متجرك الرقمي");
+  const [stats, setStats] = useState<DashboardStats>({
+    views: 0,
+    productsCount: 0,
+    categoriesCount: 0,
+    favoritesCount: 0,
+    activeOrdersCount: 0,
+    totalSales: 0
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
 
-    const fetchDashboardData = async () => {
+    // 1. جلب بيانات المتجر لمعرفة الاسم الـ ID الفعلي
+    const storeQ = query(collection(db, "stores"), where("ownerId", "==", user.uid));
+    
+    const unsubscribeStore = onSnapshot(storeQ, async (storeSnapshot) => {
       try {
-        // 1. جلب بيانات المتجر نفسه
-        const storeDoc = await getDoc(doc(db, "stores", user.uid));
-        if (storeDoc.exists()) {
-          setStore(storeDoc.data() as Store);
+        if (storeSnapshot.empty) {
+          setLoading(false);
+          return;
         }
 
-        // 2. حساب عدد المنتجات التابعة للمتجر
-        const productsQ = query(collection(db, "products"), where("storeId", "==", user.uid));
-        const productsSnapshot = await getDocs(productsQ);
+        const storeDoc = storeSnapshot.docs[0];
+        const storeData = storeDoc.data();
+        const currentStoreId = storeDoc.id;
 
-        // 3. حساب عدد الأقسام التابعة للمتجر
-        const categoriesQ = query(collection(db, "categories"), where("storeId", "==", user.uid));
-        const categoriesSnapshot = await getDocs(categoriesQ);
+        setStoreName(storeData.storeName || "متجرك الرقمي");
 
-        setStats({
-          productsCount: productsSnapshot.size,
-          categoriesCount: categoriesSnapshot.size,
+        // جلب أعداد المنتجات والأقسام المرتبطة بهذا المتجر
+        const productsQ = query(collection(db, "products"), where("storeId", "==", currentStoreId));
+        const productsSnap = await getDocs(productsQ);
+        
+        // جلب الأقسام (تعتمد على التصميم لديك، هنا نفترض تصفية الأقسام المضافة للمتجر أو حسابها من المنتجات)
+        const categoriesSet = new Set();
+        productsSnap.docs.forEach(docSnap => {
+          if (docSnap.data().category) categoriesSet.add(docSnap.data().category);
         });
+
+        // 2. الاستماع لايف للطلبات لحساب المبيعات والطلبات النشطة
+        const ordersQ = query(collection(db, "orders"), where("storeId", "==", currentStoreId));
+        
+        const unsubscribeOrders = onSnapshot(ordersQ, (ordersSnapshot) => {
+          let activeCount = 0;
+          let salesTotal = 0;
+
+          ordersSnapshot.forEach((orderDoc) => {
+            const orderData = orderDoc.data();
+            if (orderData.status === "pending" || orderData.status === "processing") {
+              activeCount++;
+            }
+            if (orderData.status === "completed") {
+              salesTotal += Number(orderData.totalPrice || 0);
+            }
+          });
+
+          setStats({
+            views: Number(storeData.views || 0),
+            productsCount: productsSnap.size,
+            categoriesCount: categoriesSet.size || Number(storeData.settings?.categoriesCount || 0),
+            favoritesCount: Number(storeData.favoritesCount || 0),
+            activeOrdersCount: activeCount,
+            totalSales: salesTotal
+          });
+          
+          setLoading(false);
+        });
+
+        return () => unsubscribeOrders();
+
       } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
+        console.error("Error fetching dashboard stats:", error);
         setLoading(false);
       }
-    };
+    });
 
-    fetchDashboardData();
+    return () => unsubscribeStore();
   }, [user]);
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="h-8 bg-gray-200 rounded w-1/4 animate-pulse"></div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 bg-gray-200 rounded-xl animate-pulse"></div>
-          ))}
+      <div className="space-y-6 animate-pulse" style={{ direction: "rtl" }}>
+        <div className="h-10 bg-slate-100 rounded-xl w-2/3" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 bg-slate-100 rounded-3xl" />)}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* ترحيب بصاحب المتجر */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-800">
-          {locale === "ar" ? `مرحباً بك في لوحة تحكم ${store?.storeName}` : `Welcome to ${store?.storeName} Dashboard`}
-        </h1>
-        <p className="text-gray-500 mt-2">
-          {locale === "ar" ? "إليك نظرة عامة على أداء متجرك اليوم" : "Here is an overview of your store performance today"}
-        </p>
+    <div className="space-y-8" style={{ direction: "rtl" }}>
+      
+      {/* 👋 ترويسة الترحيب */}
+      <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-center sm:text-right flex-col sm:flex-row">
+          <div className="p-3 bg-white/20 rounded-2xl">
+            <Store className="w-8 h-8 text-slate-950" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black">مرحباً بك في لوحة تحكم {storeName}</h1>
+            <p className="text-xs font-bold opacity-80 mt-1">إليك نظرة عامة شاملة ومباشرة على أداء متجرك اليوم</p>
+          </div>
+        </div>
       </div>
 
-      {/* بطاقات الإحصائيات الرائعة (Stats Cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-400">{locale === "ar" ? "إجمالي المشاهدات" : "Total Views"}</p>
-            <p className="text-2xl font-bold text-gray-800 mt-1">{store?.views || 0}</p>
+      {/* 📊 شبكة الكروت المطورة والمنظمة */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        {/* كارت إجمالي المبيعات (جديد) */}
+        <div className="bg-white border border-slate-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-all flex items-center justify-between overflow-hidden relative group">
+          <div className="space-y-1">
+            <span className="text-xs font-black text-slate-400 block">المبيعات المكتملة</span>
+            <span className="text-2xl font-black text-slate-900 block">
+              {stats.totalSales} <span className="text-xs text-amber-500 font-bold">ج.م</span>
+            </span>
           </div>
-          <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
+          <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform">
+            <DollarSign className="w-6 h-6" />
+          </div>
+        </div>
+
+        {/* كارت الطلبات النشطة (جديد) */}
+        <div className="bg-white border border-slate-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-all flex items-center justify-between overflow-hidden relative group">
+          <div className="space-y-1">
+            <span className="text-xs font-black text-slate-400 block">الطلبات النشطة حالياً</span>
+            <span className="text-2xl font-black text-slate-900 block">
+              {stats.activeOrdersCount} <span className="text-xs text-slate-400 font-bold">أوردر</span>
+            </span>
+          </div>
+          <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl group-hover:scale-110 transition-transform">
+            <ClipboardList className="w-6 h-6" />
+          </div>
+        </div>
+
+        {/* كارت إجمالي المشاهدات */}
+        <div className="bg-white border border-slate-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-all flex items-center justify-between overflow-hidden relative group">
+          <div className="space-y-1">
+            <span className="text-xs font-black text-slate-400 block">إجمالي الزيارات</span>
+            <span className="text-2xl font-black text-slate-900 block">{stats.views}</span>
+          </div>
+          <div className="p-4 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform">
             <Eye className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-400">{locale === "ar" ? "المنتجات" : "Products"}</p>
-            <p className="text-2xl font-bold text-gray-800 mt-1">{stats.productsCount}</p>
+        {/* كارت المنتجات */}
+        <div className="bg-white border border-slate-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-all flex items-center justify-between overflow-hidden relative group">
+          <div className="space-y-1">
+            <span className="text-xs font-black text-slate-400 block">عدد المنتجات بالمحل</span>
+            <span className="text-2xl font-black text-slate-900 block">{stats.productsCount}</span>
           </div>
-          <div className="p-3 bg-green-50 rounded-lg text-green-600">
+          <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl group-hover:scale-110 transition-transform">
             <ShoppingBag className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-400">{locale === "ar" ? "الأقسام" : "Categories"}</p>
-            <p className="text-2xl font-bold text-gray-800 mt-1">{stats.categoriesCount}</p>
+        {/* كارت الأقسام */}
+        <div className="bg-white border border-slate-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-all flex items-center justify-between overflow-hidden relative group">
+          <div className="space-y-1">
+            <span className="text-xs font-black text-slate-400 block">إجمالي الأقسام</span>
+            <span className="text-2xl font-black text-slate-900 block">{stats.categoriesCount}</span>
           </div>
-          <div className="p-3 bg-purple-50 rounded-lg text-purple-600">
-            <FolderOpen className="w-6 h-6" />
+          <div className="p-4 bg-cyan-50 text-cyan-600 rounded-2xl group-hover:scale-110 transition-transform">
+            <FolderHeart className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-400">{locale === "ar" ? "إضافات المفضلة" : "Favorites"}</p>
-            <p className="text-2xl font-bold text-gray-800 mt-1">0</p>
+        {/* كارت الإضافات المفضلة */}
+        <div className="bg-white border border-slate-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-all flex items-center justify-between overflow-hidden relative group">
+          <div className="space-y-1">
+            <span className="text-xs font-black text-slate-400 block">تفضيلات العملاء</span>
+            <span className="text-2xl font-black text-slate-900 block">{stats.favoritesCount}</span>
           </div>
-          <div className="p-3 bg-red-50 rounded-lg text-red-600">
+          <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl group-hover:scale-110 transition-transform">
             <Heart className="w-6 h-6" />
           </div>
         </div>
+
       </div>
+
     </div>
   );
 }
